@@ -46,24 +46,28 @@ export const useMapNavigation = () => {
 
   useEffect(() => {
     if (!map.current) return;
-    map.current.on("move", () => {
+    //This useEffect handles the actions on the map by creating arrow functions
+    const moveHandler = () => {
       setLng(map.current.getCenter().lng.toFixed(4));
       setLat(map.current.getCenter().lat.toFixed(4));
       setZoom(map.current.getZoom().toFixed(2));
-    });
+    };
 
-    map.current.on("click", async (event) => {
+    const clickHandler = async (event) => {
       if (canAddCustomMarker && parkMarkers.length === 0) {
+        // If canAddCustomMarker is true and we have no parkMarkers, we create a marker for the place that we selected
         const marker = new mapboxgl.Marker()
           .setLngLat([event.lngLat.lng, event.lngLat.lat])
           .addTo(map.current);
         setSelectedNeighboorhoodMarker(marker);
 
+        //We get all the data using the coordinates of the place
         const allFeatures = await getNeighboorhoodMarkers(
           event.lngLat.lng,
           event.lngLat.lat
         );
 
+        //If the request is succeeded we create markers on the map for each park
         if (allFeatures) {
           const allParks = allFeatures.features.reduce(
             (allMarkers, feature) => {
@@ -81,7 +85,17 @@ export const useMapNavigation = () => {
           setCanAddCustomMarker(!canAddCustomMarker);
         }
       }
-    });
+    };
+
+    //The events are listened by map.current.on
+    map.current.on("move", moveHandler);
+    map.current.on("click", clickHandler);
+    return () => {
+      //since canAddCustomMarker state is changed when we click the button, we can prevent bugs by cleaning the event listeners
+      //with map.current.off. Otherwise, everytime we click on the button and then click on the map, our function would be executed twice.
+      map.current.off("move", moveHandler);
+      map.current.off("click", clickHandler);
+    };
   }, [map, selectedNeighboorhoodMarker, parkMarkers, canAddCustomMarker]);
 
   const clearParkMarkers = () => {
